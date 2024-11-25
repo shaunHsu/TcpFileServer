@@ -1,5 +1,7 @@
 ﻿#include "tcpfileserver.h"
+
 #define tr QStringLiteral
+
 TcpFileServer::TcpFileServer(QWidget *parent)
     : QDialog(parent)
 {
