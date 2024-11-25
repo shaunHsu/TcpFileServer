@@ -3,6 +3,7 @@
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QApplication>
 
 tcpfilesender::tcpfilesender(QWidget *parent)
     : QDialog(parent)
@@ -44,11 +45,12 @@ tcpfilesender::tcpfilesender(QWidget *parent)
     mainWindow->addWidget(buttonBox);
     setLayout(mainWindow);
     setWindowTitle(tr("檔案傳送"));
-    connect(openButton,SIGNAL(clicked()),this,SLOT(openFile()));
-    connect(quitButton,SIGNAL(clicked()),this,SLOT(close()));
-    connect(startButton,SIGNAL(clicked()),this,SLOT(start()));
-    connect(&tcpClient,SIGNAL(connected()),this,SLOT(startTransfer()));
-    connect(&tcpClient,SIGNAL(bytesWritten(qint64)),this,SLOT(updateClientProgress(qint64)));
+
+    connect(openButton, &QPushButton::clicked, this, &tcpfilesender::openFile);
+    connect(quitButton, &QPushButton::clicked, QApplication::instance(), &QApplication::quit);
+    connect(startButton, &QPushButton::clicked, this, &tcpfilesender::start);
+    connect(&tcpClient, &QTcpSocket::connected, this, &tcpfilesender::startTransfer);
+    connect(&tcpClient, &QTcpSocket::bytesWritten, this, &tcpfilesender::updateClientProgress);
 }
 
 tcpfilesender::~tcpfilesender() {}

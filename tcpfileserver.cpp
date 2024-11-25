@@ -8,6 +8,12 @@ TcpFileServer::TcpFileServer(QWidget *parent)
     totalBytes = 0;
     byteReceived = 0;
     fileNameSize = 0;
+    QLabel *ipLabel=new QLabel(tr("ip    "));
+    ipEdit=new QLineEdit;
+    ipEdit->setText("127.0.0.1");
+    QLabel *portLabel=new QLabel(tr("port"));
+    portEdit=new QLineEdit;
+    portEdit->setText("16998");
     serverProgressBar = new QProgressBar;
     serverStatusLabel = new QLabel(QStringLiteral("伺服器端就緒"));
     startButton = new QPushButton(QStringLiteral("接收"));
@@ -16,19 +22,30 @@ TcpFileServer::TcpFileServer(QWidget *parent)
     buttonBox->addButton(startButton, QDialogButtonBox::ActionRole);
     buttonBox->addButton(quitButton,QDialogButtonBox::RejectRole);
 
+    QHBoxLayout *ipLayout=new QHBoxLayout;
+    ipLayout->addWidget(ipLabel);
+    ipLayout->addWidget(ipEdit);
+    QHBoxLayout *portLayout=new QHBoxLayout;
+    portLayout->addWidget(portLabel);
+    portLayout->addWidget(portEdit);
+
     QVBoxLayout *mainLayout = new QVBoxLayout;
+    mainLayout->addLayout(ipLayout);
+    mainLayout->addLayout(portLayout);
     mainLayout->addWidget(serverProgressBar);
     mainLayout->addWidget(serverStatusLabel);
     mainLayout->addStretch();
     mainLayout->addWidget(buttonBox);
     setLayout(mainLayout);
     setWindowTitle(QStringLiteral("接收檔案"));
-    connect(startButton, SIGNAL(clicked()), this, SLOT(start()));
-    connect(quitButton, SIGNAL(clicked()), this, SLOT(close()));
+    connect(startButton, &QPushButton::clicked, this, &TcpFileServer::start);
+    connect(quitButton, &QPushButton::clicked, QApplication::instance(), &QApplication::quit);
     connect(&tcpServer, SIGNAL(newConnection()), this, SLOT(acceptConnection()));
     connect(&tcpServer, SIGNAL(acceptError(QAbstractSocket::SocketError)),this,
             SLOT(displayError(QAbstractSocket::SocketError)));
- }
+    connect(&tcpServer, &QTcpServer::newConnection, this, &TcpFileServer::acceptConnection);
+    connect(&tcpServer, &QTcpServer::acceptError, this, &TcpFileServer::displayError);
+}
 
 TcpFileServer::~TcpFileServer()
 {
@@ -40,7 +57,7 @@ void TcpFileServer::start()
     byteReceived = 0;
     fileNameSize = 0;
     while(!tcpServer.isListening() &&
-          !tcpServer.listen(QHostAddress::AnyIPv4, 16998))
+           !tcpServer.listen(QHostAddress::AnyIPv4, 16998))
     {
         QMessageBox::StandardButton ret = QMessageBox::critical(this,
                                                                 QStringLiteral("迴圈"),
@@ -72,53 +89,52 @@ void TcpFileServer::updateServerProgress()
     QDataStream in(tcpServerConnection);
     in.setVersion(QDataStream::Qt_4_6);
     if(byteReceived <= sizeof(qint64)*2)
-      {
-         if((fileNameSize == 0) && (tcpServerConnection->bytesAvailable() >=
-                  sizeof(qint64)*2))
-          {
-              in >> totalBytes >> fileNameSize;
-              byteReceived += sizeof(qint64)*2;
-          }
-          if((fileNameSize != 0) && (tcpServerConnection->bytesAvailable() >=
-                  fileNameSize)  )
-          {
-              in >> fileName;
-              byteReceived += fileNameSize;
-              localFile = new QFile(fileName);
-              if(!localFile->open(QFile::WriteOnly))
-              {
-                  QMessageBox::warning(this, QStringLiteral("應用程式"),
-                                    QStringLiteral("無法讀取檔案 %1：\n%2.").arg(fileName)
-                                    .arg(localFile->errorString()));
-                  return;
-              }
-          }else{
-              return;
-          }
-       }
+    {
+        if((fileNameSize == 0) && (tcpServerConnection->bytesAvailable() >= sizeof(qint64)*2))
+        {
+            in >> totalBytes >> fileNameSize;
+            byteReceived += sizeof(qint64)*2;
+        }
+        if((fileNameSize != 0) && (tcpServerConnection->bytesAvailable() >=
+                                    fileNameSize)  )
+        {
+            in >> fileName;
+            byteReceived += fileNameSize;
+            localFile = new QFile(fileName);
+            if(!localFile->open(QFile::WriteOnly))
+            {
+                QMessageBox::warning(this, QStringLiteral("應用程式"),
+                                     QStringLiteral("無法讀取檔案 %1：\n%2.").arg(fileName)
+                                         .arg(localFile->errorString()));
+                return;
+            }
+        }else{
+            return;
+        }
+    }
 
     if (byteReceived < totalBytes)
-      {
-          byteReceived += tcpServerConnection->bytesAvailable();
-          inBlock = tcpServerConnection->readAll();
-          localFile->write(inBlock);
-          inBlock.resize(0);
-      }
+    {
+        byteReceived += tcpServerConnection->bytesAvailable();
+        inBlock = tcpServerConnection->readAll();
+        localFile->write(inBlock);
+        inBlock.resize(0);
+    }
 
     serverProgressBar->setMaximum(totalBytes);
     serverProgressBar->setValue(byteReceived);
     qDebug() << byteReceived;
     serverStatusLabel->setText(QStringLiteral("已接收 %1 Bytes")
-                               .arg(byteReceived));
+                                   .arg(byteReceived));
 
     if (byteReceived == totalBytes)
-      {
-          tcpServerConnection->close();
-          startButton->setEnabled(true);
-          localFile->fileName();
-          localFile->close();
-          start();
-      }
+    {
+        tcpServerConnection->close();
+        startButton->setEnabled(true);
+        localFile->fileName();
+        localFile->close();
+        start();
+    }
 
 
 
@@ -129,12 +145,12 @@ void TcpFileServer::displayError(QAbstractSocket::SocketError socketError)
     QObject * server = qobject_cast<QObject *>(sender());
     if (server == tcpServerConnection) qDebug() << "Hi I am QTcpSocket";
     if (server == &tcpServer) qDebug() << "Hi I am QTcpServer";
-   // if (socketError == QTcpSocket::RemoteHostClosedError)
-   //     return;
+    // if (socketError == QTcpSocket::RemoteHostClosedError)
+    //     return;
 
     QMessageBox::information(this, QStringLiteral("網絡錯誤"),
                              QStringLiteral("產生如下錯誤: %1.")
-                             .arg(tcpServerConnection->errorString()));
+                                 .arg(tcpServerConnection->errorString()));
     tcpServerConnection->close();
     serverProgressBar->reset();
     serverStatusLabel->setText(QStringLiteral("伺服器就緒"));

@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QtNetwork>
 #include <QtWidgets>
+#include <QLineEdit>
 
 class TcpFileServer : public QDialog
 {
@@ -18,6 +19,8 @@ public slots:
     void updateServerProgress();
     void displayError(QAbstractSocket::SocketError socketError);
 private:
+    QLineEdit *ipEdit;
+    QLineEdit *portEdit;
     QProgressBar     *serverProgressBar;
     QLabel           *serverStatusLabel;
     QPushButton      *startButton;
